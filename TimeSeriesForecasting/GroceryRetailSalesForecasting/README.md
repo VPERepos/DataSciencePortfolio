@@ -1,0 +1,1 @@
+This project is based on the dataset M5-Forecasting-accuracy (https://www.kaggle.com/competitions/m5-forecasting-accuracy).
