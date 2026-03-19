@@ -1,0 +1,10 @@
+from GroceryRetailSalesData import GroceryRetailSalesData, CumulativeSalesTimeSeriesData
+from GroceryRetailSalesForecastingModellingFunctions import generate_cumulative_sales_time_series
+
+initial_data = GroceryRetailSalesData()
+cumulative_sales_time_series_data = CumulativeSalesTimeSeriesData()
+
+cumulative_sales_time_series_data = generate_cumulative_sales_time_series(initial_data)
+
+print(cumulative_sales_time_series_data._df_validation)
+print(cumulative_sales_time_series_data._df_evaluation)
