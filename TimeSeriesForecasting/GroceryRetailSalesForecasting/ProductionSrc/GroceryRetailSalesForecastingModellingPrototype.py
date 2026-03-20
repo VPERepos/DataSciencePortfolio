@@ -9,6 +9,7 @@ from GroceryRetailSalesForecastingModellingFunctions import calculate_initial_fe
 from GroceryRetailSalesForecastingModellingFunctions import calculate_laggs_for_feature_table
 from GroceryRetailSalesForecastingModellingFunctions import train_regressor
 from GroceryRetailSalesForecastingModellingFunctions import load_xgb_models
+from GroceryRetailSalesForecastingModellingFunctions import evaluate_forecast_of_cumulative_sales
 
 from GroceryRetailSalesVisualizationUtils import plot_prophet_forecasts_validation
 from GroceryRetailSalesVisualizationUtils import plot_price_indexes
@@ -38,11 +39,13 @@ initial_feature_table = calculate_initial_feature_table(
 
 feature_table_with_laggs, feature_table_with_laggs_validation = calculate_laggs_for_feature_table(initial_feature_table)
 
-train_regressor(feature_table_with_laggs_validation)
+#train_regressor(feature_table_with_laggs_validation)
 
 loaded_models = load_xgb_models()
 
-print(loaded_models)
+evaluate_forecast_of_cumulative_sales(loaded_models, feature_table_with_laggs)
+
+
 
 
 

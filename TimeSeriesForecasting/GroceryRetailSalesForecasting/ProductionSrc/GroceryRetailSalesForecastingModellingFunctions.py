@@ -8,6 +8,8 @@ import numpy as np
 import os
 import joblib
 
+import matplotlib.pyplot as plt
+
 def generate_cumulative_sales_time_series(initial_data: GroceryRetailSalesData):
     result = {}
 
@@ -358,3 +360,46 @@ def load_xgb_models(future_horizons=28):
     
     return loaded_models
 
+def evaluate_forecast_of_cumulative_sales(loaded_models, feature_table_with_laggs):
+    features_with_labels_evaluate_by_store = {
+        store_id: group.copy()
+        for store_id, group in feature_table_with_laggs.groupby("store_id")
+    }
+    n_horizons = len(loaded_models)
+    for store in range(10):
+        label_cols = [f'y_future_{i}' for i in np.arange(1,29)]
+
+        # Drop rows with NaN in any of the label columns
+        features_with_labels_clean = features_with_labels_evaluate_by_store[store].dropna() #.reset_index(drop=True)
+
+        features_evaluate = features_with_labels_clean.drop(columns=label_cols).drop(columns='date')#.reset_index(drop=True)
+        labels_evaluate = features_with_labels_clean[label_cols]
+
+        preds_all = np.column_stack([m.predict(features_evaluate) for m in loaded_models])
+        pred_cols = [f"ypred_{i}" for i in range(n_horizons)]
+        y_cols = [f"y_{i}" for i in range(n_horizons)]
+
+        eval_df = pd.DataFrame(index=features_evaluate.index)
+        eval_df["date"] = features_with_labels_clean["date"]
+        eval_df[y_cols] = labels_evaluate.values
+        eval_df[pred_cols] = preds_all
+        valid_dates = set(eval_df['date'])
+
+        eval_df_new = eval_df[['date', 'y_0', 'ypred_0']].copy()
+        eval_df_new['date'] = eval_df_new['date'] + pd.Timedelta(days=1)
+
+        eval_df_new = eval_df_new[eval_df_new['date'].isin(valid_dates)]
+
+        plt.figure(figsize=(12, 4))
+        plt.plot(eval_df_new['date'], eval_df_new['y_0'], label='Actual')
+        plt.plot(eval_df_new['date'], eval_df_new['ypred_0'], label='Predicted')
+        plt.xlabel('Date')
+        plt.ylabel('Value')
+        plt.title('Actual vs Predicted')
+        plt.legend()
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+        plt.waitforbuttonpress()
+
+    print(features_with_labels_evaluate_by_store[0])
