@@ -2,6 +2,7 @@ import pytest
 import logging
 from GroceryRetailSalesData import GroceryRetailSalesData, CumulativeSalesTimeSeriesData
 from GroceryRetailSalesForecastingModellingFunctions import generate_cumulative_sales_time_series
+from GroceryRetailSalesForecastingModellingFunctions import generate_item_prices_per_day
 
 
 logging.basicConfig(level=logging.INFO)
@@ -52,5 +53,46 @@ def test_grocery_retail_data_class():
     assert(initial_data._store_ids[9] == 'WI_3')
 
 
-def test_generate_cumulative_sales_time_series():
-    cumulative_sales_time_series_data = generate_cumulative_sales_time_series(initial_data)
+def test_generate_item_prices_per_day():
+    item_prices_per_day = generate_item_prices_per_day(initial_data)
+    keys = list(item_prices_per_day.keys())
+    assert(keys[0] == 'CA_1')
+    assert(keys[1] == 'CA_2')
+    assert(keys[2] == 'CA_3')
+    assert(keys[3] == 'CA_4')
+    assert(keys[4] == 'TX_1')
+    assert(keys[5] == 'TX_2')
+    assert(keys[6] == 'TX_3')
+    assert(keys[7] == 'WI_1')
+    assert(keys[8] == 'WI_2')
+    assert(keys[9] == 'WI_3')
+
+    assert(item_prices_per_day[keys[0]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[0]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[1]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[1]].shape[1] == 3049)
+    
+    assert(item_prices_per_day[keys[2]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[2]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[3]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[3]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[4]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[4]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[5]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[5]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[6]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[6]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[7]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[7]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[8]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[8]].shape[1] == 3049)
+
+    assert(item_prices_per_day[keys[9]].shape[0] == 1969)
+    assert(item_prices_per_day[keys[9]].shape[1] == 3049)

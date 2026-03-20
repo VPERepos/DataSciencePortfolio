@@ -1,10 +1,48 @@
-from GroceryRetailSalesData import GroceryRetailSalesData, CumulativeSalesTimeSeriesData
+from GroceryRetailSalesData import GroceryRetailSalesData
+
 from GroceryRetailSalesForecastingModellingFunctions import generate_cumulative_sales_time_series
+from GroceryRetailSalesForecastingModellingFunctions import fit_prophet_models
+from GroceryRetailSalesForecastingModellingFunctions import generate_prophet_forecasts
+from GroceryRetailSalesForecastingModellingFunctions import generate_item_prices_per_day
+from GroceryRetailSalesForecastingModellingFunctions import calculate_price_indexes_per_store
+from GroceryRetailSalesForecastingModellingFunctions import calculate_initial_feature_table
+from GroceryRetailSalesForecastingModellingFunctions import calculate_laggs_for_feature_table
+from GroceryRetailSalesForecastingModellingFunctions import train_regressor
+from GroceryRetailSalesForecastingModellingFunctions import load_xgb_models
+
+from GroceryRetailSalesVisualizationUtils import plot_prophet_forecasts_validation
+from GroceryRetailSalesVisualizationUtils import plot_price_indexes
 
 initial_data = GroceryRetailSalesData()
-cumulative_sales_time_series_data = CumulativeSalesTimeSeriesData()
 
 cumulative_sales_time_series_data = generate_cumulative_sales_time_series(initial_data)
 
-print(cumulative_sales_time_series_data._df_validation)
-print(cumulative_sales_time_series_data._df_evaluation)
+prophet_models = fit_prophet_models(cumulative_sales_time_series_data)
+
+prophet_forecasts = generate_prophet_forecasts(prophet_models)
+
+#plot_prophet_forecasts_validation(prophet_models, prophet_forecasts, initial_data._store_ids)
+
+item_prices_per_day = generate_item_prices_per_day(initial_data)
+
+price_indexes_per_store = calculate_price_indexes_per_store(initial_data, item_prices_per_day)
+
+#plot_price_indexes(price_indexes_per_store, initial_data._store_ids)
+
+initial_feature_table = calculate_initial_feature_table(
+    prophet_forecasts,
+    price_indexes_per_store,
+    cumulative_sales_time_series_data,
+    initial_data
+)
+
+feature_table_with_laggs, feature_table_with_laggs_validation = calculate_laggs_for_feature_table(initial_feature_table)
+
+train_regressor(feature_table_with_laggs_validation)
+
+loaded_models = load_xgb_models()
+
+print(loaded_models)
+
+
+

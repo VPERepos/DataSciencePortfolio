@@ -12,7 +12,8 @@ class GroceryRetailSalesData:
         self._df_sales_evaluation = pd.read_csv(DATASETS_PATH + "/RetailOptimizationProject/m5-forecasting-accuracy/sales_train_evaluation.csv")
         self._store_ids = self._df_sales_validation['store_id'].unique()
 
-class CumulativeSalesTimeSeriesData:
+class FeaturesTablesWithLaggs:
     def __init__(self):
         self._df_validation = {}
         self._df_evaluation = {}
+
