@@ -2,24 +2,26 @@ import numpy as np
 import pandas as pd
 
 
+import numpy as np
+import pandas as pd
+
+
 class WRMSSEEvaluator:
-    def __init__(self, train_df, valid_df, calendar, prices):
+    def __init__(self, train_df, calendar, prices):
         """
-        train_df: sales_train_validation.csv
-        valid_df: validation ground truth (last 28 days)
+        train_df: MUST be sales_train_evaluation.csv for correct WRMSSE
         calendar: calendar.csv
         prices: sell_prices.csv
         """
 
-        self.train_df = train_df
-        self.valid_df = valid_df
+        self.train_df = train_df.copy()
         self.calendar = calendar
         self.prices = prices
 
         self.id_cols = ["item_id", "dept_id", "cat_id", "store_id", "state_id"]
         self.d_cols = [c for c in train_df.columns if c.startswith("d_")]
 
-        # Build hierarchy
+        # 12 hierarchical aggregation levels (official M5)
         self.levels = [
             [],
             ["state_id"],
@@ -38,7 +40,7 @@ class WRMSSEEvaluator:
         self._prepare_data()
 
     # -----------------------------
-    # PREPARE ALL COMPONENTS
+    # PREP PIPELINE
     # -----------------------------
     def _prepare_data(self):
         self._build_aggregation()
@@ -80,84 +82,94 @@ class WRMSSEEvaluator:
     # SCALE (RMSSE denominator)
     # -----------------------------
     def _compute_scales(self):
-        diff = np.diff(self.train_series, axis=1)
-        scale = np.mean(diff**2, axis=1)
+        scales = []
 
-        scale[scale == 0] = 1e-8
-        self.scale = scale
+        for series in self.train_series:
+            # Remove leading zeros (IMPORTANT for M5)
+            non_zero_idx = np.argmax(series > 0)
+            trimmed = series[non_zero_idx:]
+
+            if len(trimmed) <= 1:
+                scales.append(1e-8)
+            else:
+                diff = np.diff(trimmed)
+                scales.append(np.mean(diff ** 2))
+
+        self.scale = np.array(scales)
 
     # -----------------------------
-    # WEIGHTS
+    # WEIGHTS (Revenue-based)
     # -----------------------------
     def _compute_weights(self):
-        d_cols = self.d_cols
-        last_28 = d_cols[-28:]
+        last_28 = self.d_cols[-28:]
 
         # Map d -> week
         d_to_week = self.calendar.set_index("d")["wm_yr_wk"].to_dict()
         weeks = np.array([d_to_week[d] for d in last_28])
 
-        # Build key
         sales = self.train_df.copy()
         sales["key"] = sales["store_id"] + "_" + sales["item_id"]
 
         price_df = self.prices.copy()
         price_df["key"] = price_df["store_id"] + "_" + price_df["item_id"]
+
         price_map = price_df.set_index(["key", "wm_yr_wk"])["sell_price"]
 
-        # Sales last 28 days
         sales_values = sales[last_28].values
-
         price_matrix = np.zeros_like(sales_values, dtype=np.float32)
 
+        keys = sales["key"].values
+
         for i, week in enumerate(weeks):
-            keys = sales["key"].values
             price_matrix[:, i] = price_map.reindex(
-                pd.MultiIndex.from_arrays([keys, [week]*len(keys)])
+                pd.MultiIndex.from_arrays([keys, [week] * len(keys)])
             ).values
 
         revenue = sales_values * price_matrix
 
-        # Aggregate revenue
-        agg_revenue = self.agg_matrix @ revenue.sum(axis=1)
+        # Aggregate revenue correctly
+        agg_revenue = self.agg_matrix @ revenue
+        weights = agg_revenue.sum(axis=1)
 
-        weights = agg_revenue / agg_revenue.sum()
-        self.weights = weights
+        self.weights = weights / weights.sum()
 
     # -----------------------------
     # SCORE FUNCTION
     # -----------------------------
-    def score(self, preds):
+    def score(self, preds, actuals):
         """
-        preds: numpy array (30490, 28) bottom-level predictions
+        preds: numpy array (30490, 28)
+        actuals: numpy array (30490, 28)
         """
 
-        # Aggregate predictions
         preds_agg = self.agg_matrix @ preds
+        actuals_agg = self.agg_matrix @ actuals
 
-        # Aggregate actuals
-        valid_values = self.valid_df[self.d_cols[-28:]].values
-        valid_agg = self.agg_matrix @ valid_values
-
-        # RMSSE
-        mse = np.mean((valid_agg - preds_agg) ** 2, axis=1)
+        mse = np.mean((actuals_agg - preds_agg) ** 2, axis=1)
         rmsse = np.sqrt(mse / self.scale)
 
-        # WRMSSE
         return np.sum(self.weights * rmsse)
-        
 
-#How to use it
-#evaluator = WRMSSEEvaluator(
-#    train_df=sales_train_validation,
-#    valid_df=sales_train_validation,  # or validation split
-#    calendar=calendar,
-#    prices=sell_prices
-#)
 
-#score = evaluator.score(preds)  # preds shape: (30490, 28)
+# =====================================================
+# USAGE EXAMPLE
+# =====================================================
 
-#print("WRMSSE:", score)
+# IMPORTANT: use evaluation dataset for correct WRMSSE
+# train_df = pd.read_csv("sales_train_evaluation.csv")
+# calendar = pd.read_csv("calendar.csv")
+# prices = pd.read_csv("sell_prices.csv")
+
+# evaluator = WRMSSEEvaluator(train_df, calendar, prices)
+
+# actuals = train_df.iloc[:, -28:].values  # last 28 days
+# preds = np.random.rand(30490, 28)        # replace with your model
+
+# score = evaluator.score(preds, actuals)
+# print("WRMSSE:", score)
+
+# Sanity check:
+# print(evaluator.score(actuals, actuals))  # should be ~0
 
 
 #Submission type	        WRMSSE range
