@@ -497,7 +497,7 @@ def generate_item_predictions_direct(store_dict, df_summary, num_days=28):
     final_array = np.vstack(results)
     return final_array
 
-def calculate_predictions(eval_df_by_stores, initial_data):
+def calculate_predictions_static_shares(eval_df_by_stores, initial_data):
     df = pd.DataFrame()
     df['total_sales'] = initial_data._df_sales_evaluation.filter(like='d_').sum(axis=1)
     
@@ -529,3 +529,233 @@ def calculate_predictions(eval_df_by_stores, initial_data):
 
     print(predictions)
     return predictions
+
+
+def calculate_features_per_item(initial_data):
+    df = initial_data._df_sales_evaluation.copy()
+    
+    # 1. Identify day columns
+    day_cols = df.columns[df.columns.str.match(r"^d_\d+$")]
+
+    # 2. Normalize per store per day (vectorized)
+    df_norm = df.copy()
+    df_norm[day_cols] = df[day_cols].div(
+        df.groupby("store_id")[day_cols].transform("sum")
+    )
+
+    #check = df_norm.groupby("store_id")[day_cols].sum()
+    #print(check.head())
+
+    # 3. Reshape to long format, keeping metadata
+    id_vars = ["store_id", "item_id", "dept_id", "cat_id", "state_id"]
+    df_long = df_norm.melt(
+        id_vars=id_vars,
+        value_vars=day_cols,
+        var_name="day",
+        value_name="normalized_sales"
+    )
+
+    # 4. Clean day column
+    df_long["day"] = df_long["day"].str.replace("d_", "").astype(int)
+
+    # 5. Set final index
+    df_long = df_long.set_index(["store_id", "item_id", "day"]).sort_index()
+
+    # add more features from calendar and sell prices
+    df_long_reset = df_long.reset_index()
+    calendar_cols = [
+        "d", "date", "wday", "month", "event_name_1",
+        "event_type_1", "event_name_2", "event_type_2",
+        "snap_CA", "snap_TX", "snap_WI"
+    ]
+
+    calendar_small = initial_data._df_calendar[calendar_cols].copy()
+
+    # Merge by day column (df_long uses numeric 'day', calendar uses 'd_1','d_2',...)
+    calendar_small["day"] = calendar_small["d"].str.replace("d_", "").astype(int)
+
+    # Merge calendar info into df_long
+    df_long_reset = df_long_reset.merge(
+        calendar_small.drop(columns=["d"]),
+        on="day",
+        how="left"
+    )
+
+    # Merge wm_yr_wk from calendar
+    calendar_wm = initial_data._df_calendar[["d", "wm_yr_wk"]].copy()
+    calendar_wm["day"] = calendar_wm["d"].str.replace("d_", "").astype(int)
+
+    df_long_reset = df_long_reset.merge(
+        calendar_wm.drop(columns=["d"]),
+        on="day",
+        how="left"
+    )
+
+    # Now join sell_prices
+    df_long_reset = df_long_reset.merge(
+        initial_data._df_sell_prices,
+        on=["store_id", "item_id", "wm_yr_wk"],
+        how="left"
+    )
+
+    store_snap_map = {
+        "CA": "snap_CA",
+        "TX": "snap_TX",
+        "WI": "snap_WI"
+    }
+
+    df_long_reset["snap"] = df_long_reset.apply(
+        lambda row: row[store_snap_map[row["store_id"][:2]]],
+        axis=1
+    )
+
+    # Drop the original snap_CA/TX/WI columns
+    df_long_reset = df_long_reset.drop(columns=["snap_CA", "snap_TX", "snap_WI"])
+
+    df_long_final = df_long_reset.set_index(
+        ["store_id", "item_id", "day"]
+    ).sort_index()
+
+    cols = ["event_name_1", "event_type_1", "event_name_2", "event_type_2"]
+
+    df_long_final[cols] = df_long_final[cols].astype("string").fillna("None")
+
+    df_long_final['sell_price'] = df_long_final['sell_price'].fillna(0.0)
+
+    return df_long_final
+    
+def calculate_simplest_features_and_labels_for_dynamic_shares(features_per_item_per_store):
+    
+    n = 28
+
+    df_trimmed = (
+        features_per_item_per_store
+        .reset_index()
+    )
+
+    # count from the end within each group
+    df_trimmed["rev_rank"] = (
+        df_trimmed
+        .groupby(["store_id", "item_id"])
+        .cumcount(ascending=False)
+    )
+
+    # keep everything except last 28 days
+    df_trimmed = df_trimmed[df_trimmed["rev_rank"] >= n]
+
+    # clean up
+    df_trimmed = (
+        df_trimmed
+        .drop(columns="rev_rank")
+        .set_index(["store_id", "item_id", "day"])
+        .sort_index()
+    )
+
+    cols = ["day",
+        "store_id", "item_id", "dept_id", "cat_id", "state_id",
+        "wday", "month",
+        "event_name_1", "event_type_1",
+        "event_name_2", "event_type_2",
+        "snap", "normalized_sales", "sell_price"
+    ]
+    
+
+    df_reset = df_trimmed.reset_index()
+
+    df_features_for_shares_predictions = df_reset[cols].copy()
+
+    cat_cols = [
+        "store_id", "item_id", "dept_id", "cat_id", "state_id",
+        "event_name_1", "event_type_1",
+        "event_name_2", "event_type_2"        
+    ]
+        
+    for col in cat_cols:
+        le = LabelEncoder()
+        df_features_for_shares_predictions[col] = le.fit_transform(df_features_for_shares_predictions[col].astype(str))
+
+    lag_cols = [
+        "normalized_sales", "sell_price"
+    ]
+
+    lag = 29
+
+    # Sort by store, item, and day
+    df_features_for_shares_predictions = df_features_for_shares_predictions.sort_values(["store_id", "item_id", "day"])
+
+    # Vectorized creation of all lags
+    lagged_dfs = [
+        df_features_for_shares_predictions.groupby(["store_id", "item_id"])[lag_cols].shift(lag).rename(
+            columns={col: f"{col}_-{lag}" for col in lag_cols}
+        )
+        #for lag in range(1, lag_days + 1)
+    ]
+
+    # Concatenate all lagged columns to original df
+    df_features_for_shares_predictions = pd.concat([df_features_for_shares_predictions] + lagged_dfs, axis=1)
+
+    df_features_for_shares_predictions = df_features_for_shares_predictions.drop(columns="day")
+    df_features_for_shares_predictions = df_features_for_shares_predictions.drop(columns="sell_price")
+    
+    return  df_features_for_shares_predictions
+
+def train_dynamic_shares_regressor(df_features_for_shares_predictions):
+
+    label_cols = 'normalized_sales'
+    df_features_for_shares_predictions = df_features_for_shares_predictions.dropna().reset_index(drop=True)
+    features_train = df_features_for_shares_predictions.sample(frac=0.8, random_state=42).reset_index(drop=True)
+    labels_train = features_train[label_cols]
+    features_train = features_train.drop(columns=label_cols)
+
+    features_test = df_features_for_shares_predictions.drop(features_train.index).reset_index(drop=True)
+    labels_test = features_test[label_cols]
+    features_test = features_test.drop(columns=label_cols)
+
+    # -------------------------
+    # XGBoost training (one model per horizon)
+    # -------------------------
+    future_horizons = 1 #labels_train.shape[1]
+    
+    labels_train_pred_xgb = np.zeros_like(labels_train)
+    labels_test_pred_xgb = np.zeros_like(labels_test)
+
+    
+    model = xgb.XGBRegressor(
+        n_estimators=150,
+        max_depth=12,
+        learning_rate=0.1,
+        random_state=42,
+        n_jobs=-1
+    )
+    model.fit(features_train, labels_train)
+        
+    labels_train_pred_xgb = model.predict(features_train)
+    labels_test_pred_xgb = model.predict(features_test)
+    print(str(1)+' out of '+ str(future_horizons))
+
+    def rmse(y_true, y_pred):
+        return np.sqrt(np.mean((y_true - y_pred) ** 2))
+
+    # model
+    rmse_model = rmse(labels_test, labels_test_pred_xgb)
+
+    # baselines
+    rmse_zero = rmse(labels_test, np.zeros_like(labels_test))
+    rmse_mean = rmse(labels_test, np.full_like(labels_test, labels_train.mean()))
+
+    print(f"Model RMSE: {rmse_model:.6f}")
+    print(f"Zero RMSE:  {rmse_zero:.6f}")
+    print(f"Mean RMSE:  {rmse_mean:.6f}")
+
+    save_dir = "xgb_models_dynamic_shares"
+    os.makedirs(save_dir, exist_ok=True)
+
+    
+    filepath = os.path.join(save_dir, f"xgb_model_dynamic_shares{0}.pkl")
+    joblib.dump(model, filepath)
+
+    #Best result
+    #Model RMSE: 0.000738
+    #Zero RMSE:  0.001351
+    #Mean RMSE:  0.001311
+

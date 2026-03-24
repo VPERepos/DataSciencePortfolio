@@ -1,15 +1,15 @@
 import pytest
 import logging
-from GroceryRetailSalesData import GroceryRetailSalesData, CumulativeSalesTimeSeriesData
+from GroceryRetailSalesData import GroceryRetailSalesData #, CumulativeSalesTimeSeriesData
 from GroceryRetailSalesForecastingModellingFunctions import generate_cumulative_sales_time_series
 from GroceryRetailSalesForecastingModellingFunctions import generate_item_prices_per_day
-
+from GroceryRetailSalesForecastingModellingFunctions import calculate_features_per_item
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 initial_data = GroceryRetailSalesData()
-cumulative_sales_time_series_data = CumulativeSalesTimeSeriesData()
+#cumulative_sales_time_series_data = CumulativeSalesTimeSeriesData()
 
 def test_grocery_retail_data_class():
 
@@ -96,3 +96,9 @@ def test_generate_item_prices_per_day():
 
     assert(item_prices_per_day[keys[9]].shape[0] == 1969)
     assert(item_prices_per_day[keys[9]].shape[1] == 3049)
+
+
+def test_features_per_item():
+    
+    features_per_item_per_store = calculate_features_per_item(initial_data)
+    logger.info(features_per_item_per_store)
