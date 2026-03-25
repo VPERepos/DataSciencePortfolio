@@ -14,6 +14,7 @@ from GroceryRetailSalesForecastingModellingFunctions import calculate_prediction
 from GroceryRetailSalesForecastingModellingFunctions import calculate_features_per_item
 from GroceryRetailSalesForecastingModellingFunctions import calculate_simplest_features_and_labels_for_dynamic_shares
 from GroceryRetailSalesForecastingModellingFunctions import train_dynamic_shares_regressor
+from GroceryRetailSalesForecastingModellingFunctions import calculate_predictions_dynamic_shares
 
 from WRMSSEEvaluator import WRMSSEEvaluator
 
@@ -26,40 +27,38 @@ import pandas as pd
 
 initial_data = GroceryRetailSalesData()
 
-#cumulative_sales_time_series_data = generate_cumulative_sales_time_series(initial_data)
+cumulative_sales_time_series_data = generate_cumulative_sales_time_series(initial_data)
 
-#prophet_models = fit_prophet_models(cumulative_sales_time_series_data)
+prophet_models = fit_prophet_models(cumulative_sales_time_series_data)
 
-#prophet_forecasts = generate_prophet_forecasts(prophet_models)
+prophet_forecasts = generate_prophet_forecasts(prophet_models)
 
 #plot_prophet_forecasts_validation(prophet_models, prophet_forecasts, initial_data._store_ids)
 
-#item_prices_per_day = generate_item_prices_per_day(initial_data)
+item_prices_per_day = generate_item_prices_per_day(initial_data)
 
-#price_indexes_per_store = calculate_price_indexes_per_store(initial_data, item_prices_per_day)
+price_indexes_per_store = calculate_price_indexes_per_store(initial_data, item_prices_per_day)
 
 #plot_price_indexes(price_indexes_per_store, initial_data._store_ids)
 
-#initial_feature_table = calculate_initial_feature_table(
-#    prophet_forecasts,
-#    price_indexes_per_store,
-#    cumulative_sales_time_series_data,
-#    initial_data
-#)
+initial_feature_table = calculate_initial_feature_table(
+    prophet_forecasts,
+    price_indexes_per_store,
+    cumulative_sales_time_series_data,
+    initial_data
+)
 
-#feature_table_with_laggs, feature_table_with_laggs_validation = calculate_laggs_for_feature_table(initial_feature_table)
+feature_table_with_laggs, feature_table_with_laggs_validation = calculate_laggs_for_feature_table(initial_feature_table)
 
 #train_regressor(feature_table_with_laggs_validation)
 
-#loaded_models = load_xgb_models()
+loaded_models = load_xgb_models()
 
-#eval_df_by_stores = evaluate_forecast_of_cumulative_sales(loaded_models, feature_table_with_laggs, initial_data._store_ids)
+eval_df_by_stores = evaluate_forecast_of_cumulative_sales(loaded_models, feature_table_with_laggs, initial_data._store_ids)
 
 #plot_cumulative_sales_preds_vs_actual(eval_df_by_stores)
 
 print("Calculating features for dynamic shares approach")
-
-# normalized_sales_per_store_per_item = normalize_shares(initial_data)
 
 #features_per_item_per_store = calculate_features_per_item(initial_data)
 
@@ -83,7 +82,8 @@ features_per_item_per_store = features_per_item_per_store.set_index(
 
 #print(features_per_item_per_store)
 
-df_features_for_shares_predictions = calculate_simplest_features_and_labels_for_dynamic_shares(features_per_item_per_store)
+#df_features_for_shares_predictions = calculate_simplest_features_and_labels_for_dynamic_shares(features_per_item_per_store, 28)
+df_features_for_shares_predictions = calculate_simplest_features_and_labels_for_dynamic_shares(features_per_item_per_store, 0)
 
 #print(df_features_for_shares_predictions)
 
@@ -99,7 +99,10 @@ df_features_for_shares_predictions = calculate_simplest_features_and_labels_for_
 
 print("Training")
 train_dynamic_shares_regressor(df_features_for_shares_predictions)
+
 print("Calculating predicitons")
+
+preds_dynamic_shares = calculate_predictions_dynamic_shares(eval_df_by_stores, features_per_item_per_store, df_features_for_shares_predictions)
 
 #preds_static_shares = calculate_predictions_static_shares(eval_df_by_stores, initial_data)
 
