@@ -1,3 +1,7 @@
 *.pkl
+<<<<<<< HEAD
 *.csv
 *.npy
+=======
+*.csv
+>>>>>>> d664b94b4789b8d0b4ab991a29f9fbccfea82ef8
