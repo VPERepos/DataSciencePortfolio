@@ -751,7 +751,7 @@ def calculate_simplest_features_and_labels_for_dynamic_shares(features_per_item_
         )
 
         # keep everything except last 28 days
-        df_trimmed = df_trimmed[df_trimmed["rev_rank"] >= n]
+        df_trimmed = df_trimmed[df_trimmed["rev_rank"] >= number_of_last_days_to_skip]
 
         # clean up
         df_trimmed = (
