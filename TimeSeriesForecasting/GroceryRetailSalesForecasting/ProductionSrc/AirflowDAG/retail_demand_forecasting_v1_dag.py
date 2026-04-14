@@ -4,7 +4,12 @@ import pandas as pd
 import os
 import psycopg2
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+import sys
+sys.path.append('/opt/airflow/src')
+
+from GroceryRetailSalesForecastingProductionFunctions import load_data_to_production_database
+
+PRODUCTION_DATABASE_URL = os.getenv("PRODUCTION_DATABASE_URL")
 
 @dag(
     dag_id="retail_demand_forecasting_v1",
@@ -15,24 +20,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def retail_demand_forecasting():
 
     @task
-    def load_files_to_database():
-        file_path = "/opt/airflow/data/calendar.csv"
-        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-        cur = conn.cursor()
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS working_hours_long (
-                worker_id BIGINT,
-                week_label TEXT,
-                minutes BIGINT,
-
-                CONSTRAINT fk_worker
-                    FOREIGN KEY (worker_id)
-                    REFERENCES workers(worker_id)
-            );
-        """)
+    def load_files_to_database(execute_step):
+        if(execute_step):
+            print("Step 1: Load Data to Production Database.")
+            load_data_to_production_database("/opt/airflow/data/", PRODUCTION_DATABASE_URL)
         
-
     @task
     def step2():
         print("Step 2: Feature engineering")
@@ -45,11 +37,11 @@ def retail_demand_forecasting():
     def step4():
         print("Step 4: Save predictions")
 
-    s1 = load_files_to_database()
+    s1 = load_files_to_database(False)
     s2 = step2()
     s3 = step3()
     s4 = step4()
 
     s1 >> s2 >> s3 >> s4
-
+    
 retail_demand_forecasting()
