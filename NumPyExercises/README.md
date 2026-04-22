@@ -1,0 +1,2 @@
+# NumPy Exercises
+This notebook consists of solutions to tasks for basic NumPy functionality. The goal is to show that the author is aware of pythonic way of vectorized calculations. The exercises are taken mostly from here: https://github.com/rougier/numpy-100/blob/master/100_Numpy_exercises.ipynb 

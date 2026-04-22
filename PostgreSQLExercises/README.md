@@ -1,0 +1,2 @@
+# PostgreSQL exercises
+In order to train basic functionality of SQL around 17 exercises were created basing on 3 imaginary tables that are related to each other. This includes the most important CRUD and table structure manipulation SQL functions for creating data views for analysis.

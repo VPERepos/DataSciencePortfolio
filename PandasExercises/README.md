@@ -1,0 +1,2 @@
+# Pandas Exercises
+This jupyter notebook consists of the author's solutions to exercises on basic functionality of Pandas. These exercises are mostly taken from here: https://github.com/ajcr/100-pandas-puzzles/blob/master/100-pandas-puzzles.ipynb
