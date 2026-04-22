@@ -1,4 +1,4 @@
-# DataSciencePortfolio
+# Data Science Portfolio
 ## Motivation
 The goal of this collection of projects is to demonstrate the knowledge, experience and ability of the author to solve data science problems in the field of bussiness data analytics and modelling.
 ## Structure
