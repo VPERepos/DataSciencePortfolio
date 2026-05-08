@@ -1,6 +1,6 @@
 # Customer Churn and Survival Analysis.
 ## Problem definition.
-This project is based on the IBM Customer Churn dataset.
+This project is based on the **IBM Customer Churn** dataset.
 
 The goal is first to train a classifier, which predicts the probability of a customer to churn. Secondary, the importance of the features for customer churn has to be estimated by a survival model, the scores are then used to segment customers into risk groups and estimate their probabilities to stay over time. This enables informed bussiness decisions for customer churn prevention treatments. 
 
